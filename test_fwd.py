@@ -7,7 +7,7 @@ import os
 
 def main():
 
-    path = "/home/wen/test_dict.pt"
+    path = "./test_dict.pt"
 
     test_dict = torch.load(path)
     raster_settings = SimpleNamespace(**test_dict['raster_settings'])
