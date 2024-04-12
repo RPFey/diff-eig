@@ -50,7 +50,9 @@ namespace CudaRasterizer
 			const bool prefiltered,
 			float* out_color,
 			float* out_depth,
+			float* out_opacity,
 			int* radii = nullptr,
+			int* n_touched = nullptr,
 			bool debug = false);
 
 		static void backward(
@@ -66,22 +68,27 @@ namespace CudaRasterizer
 			const float* cov3D_precomp,
 			const float* viewmatrix,
 			const float* projmatrix,
-			const float* campos,
+            const float* projmatrix_raw,
+            const float* campos,
 			const float tan_fovx, float tan_fovy,
 			const int* radii,
 			char* geom_buffer,
 			char* binning_buffer,
 			char* image_buffer,
 			const float* dL_dpix,
+			const float* dL_dpix_depth,
 			float* dL_dmean2D,
 			float* dL_dconic,
 			float* dL_dopacity,
 			float* dL_dcolor,
+			float* dL_ddepths,
 			float* dL_dmean3D,
 			float* dL_dcov3D,
 			float* dL_dsh,
 			float* dL_dscale,
 			float* dL_drot,
+			float* dL_dtau,
+			const int power,
 			bool debug);
 	};
 };

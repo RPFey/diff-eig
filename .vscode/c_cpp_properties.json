@@ -4,7 +4,9 @@
             "name": "Linux",
             "includePath": [
                 "${default}",
-                "/mnt/kostas-graid/sw/envs/wen/miniconda3/envs/pt2/lib/python3.10/site-packages/torch/include/torch/csrc/api/include/torch"
+                "/home/wen/anaconda3/envs/plenoxel/lib/python3.8/site-packages/torch/include/**",
+                "/usr/include/python3.8",
+                "./third_party/glm"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
