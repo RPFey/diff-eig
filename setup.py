@@ -15,11 +15,11 @@ import os
 os.path.dirname(os.path.abspath(__file__))
 
 setup(
-    name="modified_diff_gaussian_rasterization_depth",
-    packages=['modified_diff_gaussian_rasterization_depth'],
+    name="diff_eig",
+    packages=['diff_eig'],
     ext_modules=[
         CUDAExtension(
-            name="modified_diff_gaussian_rasterization_depth._C",
+            name="diff_eig._C",
             sources=[
             "cuda_rasterizer/rasterizer_impl.cu",
             "cuda_rasterizer/forward.cu",
