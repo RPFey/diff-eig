@@ -105,10 +105,62 @@ class _RasterizeGaussians(torch.autograd.Function):
         ctx.raster_settings = raster_settings
         ctx.num_rendered = num_rendered
         ctx.save_for_backward(colors_precomp, means3D, scales, rotations, cov3Ds_precomp, radii, sh, geomBuffer, binningBuffer, imgBuffer)
-        return color, radii, depth, opacity, n_touched
+
+        grad_out_color = torch.ones_like(color)
+        grad_out_depth = torch.ones_like(depth)
+        args = (raster_settings.bg,
+                means3D,
+                radii,
+                colors_precomp,
+                scales,
+                rotations,
+                raster_settings.scale_modifier,
+                cov3Ds_precomp,
+                raster_settings.viewmatrix,
+                raster_settings.projmatrix,
+                raster_settings.projmatrix_raw,
+                raster_settings.tanfovx,
+                raster_settings.tanfovy,
+                grad_out_color,
+                grad_out_depth,
+                sh,
+                raster_settings.sh_degree,
+                raster_settings.campos,
+                geomBuffer,
+                num_rendered,
+                binningBuffer,
+                imgBuffer,
+                raster_settings.gradient_power,
+                raster_settings.debug)
+
+        # Compute gradients for relevant tensors by invoking backward method
+        if raster_settings.debug:
+            cpu_args = cpu_deep_copy_tuple(args) # Copy them before they can be corrupted
+            try:
+                grad_means2D, grad_colors_precomp, grad_opacities, grad_means3D, grad_cov3Ds_precomp, grad_sh, grad_scales, grad_rotations, grad_tau = _C.rasterize_gaussians_backward(*args)
+            except Exception as ex:
+                torch.save(cpu_args, "snapshot_bw.dump")
+                print("\nAn error occured in backward. Writing snapshot_bw.dump for debugging.\n")
+                raise ex
+        else:
+             grad_means2D, grad_colors_precomp, grad_opacities, grad_means3D, grad_cov3Ds_precomp, grad_sh, grad_scales, grad_rotations, grad_tau = _C.rasterize_gaussians_backward(*args)
+        
+        # Not needed for now
+        # J^T J for pose parameters
+        # if raster_settings.gradient_power > 1:
+        #     JTJ_tau = torch.mm(grad_tau.view(-1, 6).t(), grad_tau.view(-1, 6))
+        # else:
+        #     JTJ_tau = None
+
+        grad_tau = torch.sum(grad_tau.view(-1, 6), dim=0)
+        grad_rho = grad_tau[:3].view(1, -1)
+        grad_theta = grad_tau[3:].view(1, -1)
+
+        return grad_means3D, grad_sh, grad_opacities, grad_scales, grad_rotations, grad_theta, grad_rho,\
+              color, radii, depth, opacity, n_touched
 
     @staticmethod
-    def backward(ctx, grad_out_color, grad_out_radii, grad_out_depth, grad_out_opacity, grad_n_touched):
+    def backward(ctx, grad_means3D, grad_sh, grad_opacities, grad_scales, grad_rotations, grad_theta, grad_rho, *args):
 
         # Restore necessary values from context
         num_rendered = ctx.num_rendered
