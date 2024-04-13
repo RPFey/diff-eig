@@ -1540,7 +1540,7 @@ eig_backward_kernel(
 			);
 
 			// start the real backward pass
-			// Reflection point
+			//!NOTE: Reflection point
 			glm::vec3 cur_dE_dmeans = 2.f * cur_dL_dmeans * dE_dmean3D[global_id];
 			glm::vec3* cur_vec_dE_dshs = (glm::vec3*) dE_dshs + global_id * num_shs;
             if(D > 0){

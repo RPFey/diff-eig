@@ -204,6 +204,12 @@ class _RasterizeGaussians(torch.autograd.Function):
                 raster_settings.gradient_power,
                 raster_settings.debug)
         grad_out_color, grad_out_depth = _C.eig_backward(*args) 
+        # import matplotlib.pyplot as plt
+        # import seaborn as sns
+        # breakpoint()
+        # To avoid overflow during the gradient explosion on the second backward pass
+        grad_out_color = torch.clamp(grad_out_color, -1e10, 1e10)
+        grad_out_depth = torch.clamp(grad_out_depth, -1e10, 1e10)
 
         # Restructure args as C++ method expects them
         args = (raster_settings.bg,

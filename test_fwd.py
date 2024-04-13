@@ -20,6 +20,7 @@ def main():
     #     call_dict[name].requires_grad_()
     for k, v in call_dict.items():
         if v is not None:
+            v.grad = None
             v.retain_grad()
 
     grad_means3D, grad_sh, grad_opacities, grad_scales, grad_rotations, grad_theta, grad_rho, JTJ_tau,\
@@ -40,7 +41,10 @@ def main():
             avg_diff = norm / ref_hessian_dict[k].numel()
             print(f"{k} norm: {norm.item()}, avg_diff: {avg_diff.item()}")
 
+    # loss = sum(i.mean() for i in grads) / len(grads)
     loss = sum(i.sum() for i in grads)
+    print(loss)
+    breakpoint()
     loss.backward()
 
     for param_name in param_names:
