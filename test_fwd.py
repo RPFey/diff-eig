@@ -22,7 +22,7 @@ def main():
         if v is not None:
             v.retain_grad()
 
-    grad_means3D, grad_sh, grad_opacities, grad_scales, grad_rotations, grad_theta, grad_rho,\
+    grad_means3D, grad_sh, grad_opacities, grad_scales, grad_rotations, grad_theta, grad_rho, JTJ_tau,\
         im, radii, depth, opacity, n_touched = rasterizer(**call_dict)
     
     grads = (grad_means3D, grad_sh, grad_opacities, grad_scales, grad_rotations, grad_theta, grad_rho)
@@ -30,7 +30,9 @@ def main():
     # render_result = torch.cat([im, depth], dim=0)
     # render_result.backward(torch.ones_like(render_result))
 
-    for k, v in zip(['means3D', 'shs', 'opacities', 'scales', 'rotations', 'theta', 'rho'], grads):
+    param_names = ['means3D', 'shs', 'opacities', 'scales', 'rotations', 'theta', 'rho']
+
+    for k, v in zip(param_names, grads):
         if torch.allclose(ref_hessian_dict[k], v):
             print(f"{k} ✅")
         else:
@@ -40,6 +42,9 @@ def main():
 
     loss = sum(i.sum() for i in grads)
     loss.backward()
+
+    for param_name in param_names:
+        print(f"{param_name} grad: {call_dict[param_name].grad}"    )
     breakpoint()
     
 
