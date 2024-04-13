@@ -23,7 +23,7 @@ setup(
             sources=[
             "cuda_rasterizer/rasterizer_impl.cu",
             "cuda_rasterizer/forward.cu",
-            # "cuda_rasterizer/backward.cu",
+            "cuda_rasterizer/backward.cu",
             "cuda_rasterizer/fisher_forward.cu",
             "cuda_rasterizer/fisher_backward.cu",
             "rasterize_points.cu",
