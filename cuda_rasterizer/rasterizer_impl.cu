@@ -28,8 +28,8 @@ namespace cg = cooperative_groups;
 
 #include "auxiliary.h"
 #include "forward.h"
-#include "backward.h"
-#include "eig_backward.h"
+#include "fisher_forward.h"
+#include "fisher_backward.h"
 
 // Helper function to find the next-highest bit of the MSB
 // on the CPU.
@@ -346,7 +346,7 @@ int CudaRasterizer::Rasterizer::forward(
 
 // Produce necessary gradients for optimization, corresponding
 // to forward render pass
-void CudaRasterizer::Rasterizer::backward(
+void CudaRasterizer::Rasterizer::fisher_forward(
 	const int P, int D, int M, int R,
 	const float* background,
 	const int width, int height,
@@ -401,7 +401,7 @@ void CudaRasterizer::Rasterizer::backward(
 	const float* cov3D_ptr = (cov3D_precomp != nullptr) ? cov3D_precomp : geomState.cov3D;
 	const float* depth_ptr = geomState.depths;
 
-	CHECK_CUDA(BACKWARD::renderFused(
+	CHECK_CUDA(FISHER_FORWARD::renderFused(
 		tile_grid,
 		block,
 		imgState.ranges,
@@ -448,7 +448,7 @@ void CudaRasterizer::Rasterizer::backward(
 		), debug)
 }
 
-void CudaRasterizer::Rasterizer::EIGbackward(
+void CudaRasterizer::Rasterizer::fihser_backward(
 	const int P, int D, int M, int R,
 	const float* background,
 	const int width, int height,
@@ -498,7 +498,7 @@ void CudaRasterizer::Rasterizer::EIGbackward(
 	const float* cov3D_ptr = (cov3D_precomp != nullptr) ? cov3D_precomp : geomState.cov3D;
 	const float* depth_ptr = geomState.depths;
 
-	CHECK_CUDA(EIG_BACKWARD::eig_backward(
+	CHECK_CUDA(FISHER_BACKWARD::backward(
 		tile_grid,
 		block,
 		imgState.ranges,

@@ -55,7 +55,7 @@ namespace CudaRasterizer
 			int* n_touched = nullptr,
 			bool debug = false);
 
-		static void backward(
+		static void fisher_forward(
 			const int P, int D, int M, int R,
 			const float* background,
 			const int width, int height,
@@ -90,7 +90,8 @@ namespace CudaRasterizer
 			float* dL_dtau,
 			const int power,
 			bool debug);
-		static void EIGbackward(
+
+		static void fihser_backward(
 			const int P, int D, int M, int R,
 			const float* background,
 			const int width, int height,

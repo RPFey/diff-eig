@@ -122,7 +122,7 @@ RasterizeGaussiansCUDA(
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
- RasterizeGaussiansBackwardCUDA(
+ FisherForwardCUDA(
  	const torch::Tensor& background,
 	const torch::Tensor& means3D,
 	const torch::Tensor& radii,
@@ -172,7 +172,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Te
 
   if(P != 0)
   {  
-	  CudaRasterizer::Rasterizer::backward(P, degree, M, R,
+	  CudaRasterizer::Rasterizer::fisher_forward(P, degree, M, R,
 	  background.contiguous().data<float>(),
 	  W, H, 
 	  means3D.contiguous().data<float>(),
@@ -234,7 +234,7 @@ torch::Tensor markVisible(
 }
 
 std::tuple<torch::Tensor, torch::Tensor>
- EIGBackwardCUDA(
+ FisherBackwardCUDA(
  	const torch::Tensor& background,
 	const torch::Tensor& means3D,
 	const torch::Tensor& radii,
@@ -288,7 +288,7 @@ std::tuple<torch::Tensor, torch::Tensor>
 
   if(P != 0)
   {  
-	  CudaRasterizer::Rasterizer::EIGbackward(P, degree, M, R,
+	  CudaRasterizer::Rasterizer::fihser_backward(P, degree, M, R,
 	  background.contiguous().data<float>(),
 	  W, H, 
 	  means3D.contiguous().data<float>(),

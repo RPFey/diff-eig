@@ -9,20 +9,18 @@
  * For inquiries contact  george.drettakis@inria.fr
  */
 
-#ifndef CUDA_RASTERIZER_EIG_BACKWARD_H_INCLUDED
-#define CUDA_RASTERIZER_EIG_BACKWARD_H_INCLUDED
+#ifndef CUDA_RASTERIZER_FISHER_FORWARD_H_INCLUDED
+#define CUDA_RASTERIZER_FISHER_FORWARD_H_INCLUDED
 
 #include <cuda.h>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#ifndef GLM_FORCE_CUDA
 #define GLM_FORCE_CUDA
-#endif
 #include <glm/glm.hpp>
 
-namespace EIG_BACKWARD
+namespace FISHER_FORWARD 
 {
-void eig_backward(
+	void renderFused(
 		const dim3 grid, const dim3 block,
 		const uint2* ranges,
 		const uint32_t* point_list,
@@ -34,6 +32,12 @@ void eig_backward(
 		const float* depth,
 		const float* final_Ts,
 		const uint32_t* n_contrib,
+		const float* dL_dpixels,
+		const float* dL_dpix_depth,
+		float3* dL_dmean2D,
+		float4* dL_dconic2D,
+		float* dL_dopacity,
+		float* dL_dcolors,
 		// params for preprocess in backward
 		int P, int D, int M,
 		const float3* means3D,
@@ -50,15 +54,14 @@ void eig_backward(
 		const float focal_x, float focal_y,
 		const float tan_fovx, float tan_fovy,
 		const glm::vec3* campos,
-		const glm::vec3* dE_dmean3D,
-		const float* dE_dopacity,
-		const float* dE_dsh,
-		const glm::vec3* dE_dscale,
-		const glm::vec4* dE_drot,
-		const float* dE_dtaus,
-		// output
-		float* dE_dpixels,
-		float* dE_dpixels_depth,
+		// const float3* dL_dmean2D,
+		const float* dL_dconic,
+		glm::vec3* dL_dmean3D,
+		float* dL_dcov3D,
+		float* dL_dsh,
+		glm::vec3* dL_dscale,
+		glm::vec4* dL_drot,
+		float* dL_dtau,
 		const int grad_power
 	);
 }

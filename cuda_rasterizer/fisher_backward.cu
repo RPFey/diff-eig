@@ -9,7 +9,7 @@
  * For inquiries contact  george.drettakis@inria.fr
  */
 
-#include "eig_backward.h"
+#include "fisher_backward.h"
 #include "auxiliary.h"
 #include "math.h"
 #include <cooperative_groups.h>
@@ -1262,7 +1262,7 @@ __device__ void preprocessCUDA_backward(
 
 template <uint32_t C>
 __global__ void __launch_bounds__(BLOCK_X * BLOCK_Y)
-eig_backward_kernel(
+fisher_backward_kernel(
 	// params for render function
 	const uint2* __restrict__ ranges,
 	const uint32_t* __restrict__ point_list,
@@ -1641,7 +1641,7 @@ eig_backward_kernel(
 }
 
 // Fused kernel for the whole backward process
-void EIG_BACKWARD::eig_backward(
+void FISHER_BACKWARD::backward(
 		const dim3 grid, const dim3 block,
 		const uint2* ranges,
 		const uint32_t* point_list,
@@ -1681,7 +1681,7 @@ void EIG_BACKWARD::eig_backward(
 		const int grad_power
 	)
 {
-	eig_backward_kernel<NUM_CHANNELS> <<<grid, block >>> (
+	fisher_backward_kernel<NUM_CHANNELS> <<<grid, block >>> (
 		ranges,
 		point_list,
 		W, H,
