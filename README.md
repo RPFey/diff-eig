@@ -34,3 +34,11 @@ If you can make use of it in your own research, please be so kind to cite both p
 </div>
 </section>
 
+
+
+### Test out glm funcs:
+
+```
+g++ glm_test.cpp -I./third_party/glm/
+./a.out
+```

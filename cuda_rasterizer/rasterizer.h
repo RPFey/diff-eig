@@ -90,6 +90,36 @@ namespace CudaRasterizer
 			float* dL_dtau,
 			const int power,
 			bool debug);
+		static void EIGbackward(
+			const int P, int D, int M, int R,
+			const float* background,
+			const int width, int height,
+			const float* means3D,
+			const float* shs,
+			const float* colors_precomp,
+			const float* scales,
+			const float scale_modifier,
+			const float* rotations,
+			const float* cov3D_precomp,
+			const float* viewmatrix,
+			const float* projmatrix,
+			const float* projmatrix_raw,
+			const float* campos,
+			const float tan_fovx, float tan_fovy,
+			const int* radii,
+			char* geom_buffer,
+			char* binning_buffer,
+			char* img_buffer,
+			const float* dE_dmeans3D,
+			const float* dE_dsh,
+			const float* dE_dopacities,
+			const float* dE_dscales,
+			const float* dE_drotations,
+			const float* dE_dtaus,
+			float* dE_dpixels,
+			float* dE_dpixels_depth,
+			const int power,
+			bool debug);
 	};
 };
 

@@ -64,6 +64,39 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Te
 	const torch::Tensor& imageBuffer,
 	const int power,
 	const bool debug);
+
+std::tuple<torch::Tensor, torch::Tensor>
+ EIGBackwardCUDA(
+ 	const torch::Tensor& background,
+	const torch::Tensor& means3D,
+	const torch::Tensor& radii,
+    const torch::Tensor& colors,
+	const torch::Tensor& scales,
+	const torch::Tensor& rotations,
+	const float scale_modifier,
+	const torch::Tensor& cov3D_precomp,
+	const torch::Tensor& viewmatrix,
+    const torch::Tensor& projmatrix,
+    const torch::Tensor& projmatrix_raw,
+    const float tan_fovx,
+	const float tan_fovy,
+	const torch::Tensor& dE_dmeans3D,
+	const torch::Tensor& dE_dsh,
+	const torch::Tensor& dE_dopacities,
+	const torch::Tensor& dE_dscales,
+	const torch::Tensor& dE_drotations,
+	const torch::Tensor& dE_dtau,
+    const int image_height,
+    const int image_width,
+	const torch::Tensor& sh,
+	const int degree,
+	const torch::Tensor& campos,
+	const torch::Tensor& geomBuffer,
+	const int R,
+	const torch::Tensor& binningBuffer,
+	const torch::Tensor& imageBuffer,
+	const int power,
+	const bool debug);
 		
 torch::Tensor markVisible(
 		torch::Tensor& means3D,

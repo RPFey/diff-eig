@@ -1385,9 +1385,10 @@ renderCUDAFused(
 			atomicAdd(&dL_dmean2D[global_id].y, powf(cur_dL_dmean2D.y, grad_power));
 
 			// Update gradients w.r.t. 2D covariance (2x2 matrix, symmetric)
-			atomicAdd(&dL_dconic2D[global_id].x, powf(cur_dL_dconic2D.x, grad_power));
-			atomicAdd(&dL_dconic2D[global_id].y, powf(cur_dL_dconic2D.y, grad_power));
-			atomicAdd(&dL_dconic2D[global_id].w, powf(cur_dL_dconic2D.w, grad_power));
+			// not passed to autograd func during forward
+			// atomicAdd(&dL_dconic2D[global_id].x, powf(cur_dL_dconic2D.x, grad_power));
+			// atomicAdd(&dL_dconic2D[global_id].y, powf(cur_dL_dconic2D.y, grad_power));
+			// atomicAdd(&dL_dconic2D[global_id].w, powf(cur_dL_dconic2D.w, grad_power));
 
 			// atomicAdd((float3*)&dL_dmean3D[global_id], cur_dL_dmeans);
 			atomicAdd(&dL_dmean3D[global_id].x, powf(cur_dL_dmeans.x, grad_power));

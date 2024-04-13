@@ -37,6 +37,10 @@ def main():
             norm = torch.norm(ref_hessian_dict[k] - v)
             avg_diff = norm / ref_hessian_dict[k].numel()
             print(f"{k} norm: {norm.item()}, avg_diff: {avg_diff.item()}")
+
+    loss = sum(i.sum() for i in grads)
+    loss.backward()
+    breakpoint()
     
 
 

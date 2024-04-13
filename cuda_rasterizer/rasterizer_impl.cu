@@ -29,6 +29,7 @@ namespace cg = cooperative_groups;
 #include "auxiliary.h"
 #include "forward.h"
 #include "backward.h"
+#include "eig_backward.h"
 
 // Helper function to find the next-highest bit of the MSB
 // on the CPU.
@@ -443,6 +444,96 @@ void CudaRasterizer::Rasterizer::backward(
 		(glm::vec3*)dL_dscale,
 		(glm::vec4*)dL_drot,
 		dL_dtau,
+		power
+		), debug)
+}
+
+void CudaRasterizer::Rasterizer::EIGbackward(
+	const int P, int D, int M, int R,
+	const float* background,
+	const int width, int height,
+	const float* means3D,
+	const float* shs,
+	const float* colors_precomp,
+	const float* scales,
+	const float scale_modifier,
+	const float* rotations,
+	const float* cov3D_precomp,
+	const float* viewmatrix,
+	const float* projmatrix,
+    const float* projmatrix_raw,
+    const float* campos,
+	const float tan_fovx, float tan_fovy,
+	const int* radii,
+	char* geom_buffer,
+	char* binning_buffer,
+	char* img_buffer,
+	const float* dE_dmeans3D,
+	const float* dE_dsh,
+	const float* dE_dopacities,
+	const float* dE_dscales,
+	const float* dE_drotations,
+	const float* dE_dtaus,
+	float* dE_dpixels,
+	float* dE_dpixels_depth,
+	const int power,
+	bool debug)
+{
+	GeometryState geomState = GeometryState::fromChunk(geom_buffer, P);
+	BinningState binningState = BinningState::fromChunk(binning_buffer, R);
+	ImageState imgState = ImageState::fromChunk(img_buffer, width * height);
+
+	if (radii == nullptr)
+	{
+		radii = geomState.internal_radii;
+	}
+
+	const float focal_y = height / (2.0f * tan_fovy);
+	const float focal_x = width / (2.0f * tan_fovx);
+
+	const dim3 tile_grid((width + BLOCK_X - 1) / BLOCK_X, (height + BLOCK_Y - 1) / BLOCK_Y, 1);
+	const dim3 block(BLOCK_X, BLOCK_Y, 1);
+
+	const float* color_ptr = (colors_precomp != nullptr) ? colors_precomp : geomState.rgb;
+	const float* cov3D_ptr = (cov3D_precomp != nullptr) ? cov3D_precomp : geomState.cov3D;
+	const float* depth_ptr = geomState.depths;
+
+	CHECK_CUDA(EIG_BACKWARD::eig_backward(
+		tile_grid,
+		block,
+		imgState.ranges,
+		binningState.point_list,
+		width, height,
+		background,
+		geomState.means2D,
+		geomState.conic_opacity,
+		color_ptr,
+		depth_ptr,
+		imgState.accum_alpha,
+		imgState.n_contrib,
+		P, D, M,
+		(float3*)means3D,
+		radii,
+		shs,
+		geomState.clamped,
+		(glm::vec3*)scales,
+		(glm::vec4*)rotations,
+		scale_modifier,
+		cov3D_ptr,
+		viewmatrix,
+		projmatrix,
+		projmatrix_raw,
+		focal_x, focal_y,
+		tan_fovx, tan_fovy,
+		(const glm::vec3*)campos,
+		(const glm::vec3*) dE_dmeans3D,
+		(const float*) dE_dopacities,	
+		(const float*) dE_dsh,
+		(const glm::vec3*) dE_dscales,
+		(const glm::vec4*) dE_drotations,
+		(const float*) dE_dtaus,
+		dE_dpixels,
+		dE_dpixels_depth,
 		power
 		), debug)
 }

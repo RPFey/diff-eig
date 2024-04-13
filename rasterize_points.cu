@@ -232,3 +232,93 @@ torch::Tensor markVisible(
   
   return present;
 }
+
+std::tuple<torch::Tensor, torch::Tensor>
+ EIGBackwardCUDA(
+ 	const torch::Tensor& background,
+	const torch::Tensor& means3D,
+	const torch::Tensor& radii,
+    const torch::Tensor& colors,
+	const torch::Tensor& scales,
+	const torch::Tensor& rotations,
+	const float scale_modifier,
+	const torch::Tensor& cov3D_precomp,
+	const torch::Tensor& viewmatrix,
+    const torch::Tensor& projmatrix,
+    const torch::Tensor& projmatrix_raw,
+    const float tan_fovx,
+	const float tan_fovy,
+	const torch::Tensor& dE_dmeans3D,
+	const torch::Tensor& dE_dsh,
+	const torch::Tensor& dE_dopacities,
+	const torch::Tensor& dE_dscales,
+	const torch::Tensor& dE_drotations,
+	const torch::Tensor& dE_dtau,
+    const int image_height,
+    const int image_width,
+	const torch::Tensor& sh,
+	const int degree,
+	const torch::Tensor& campos,
+	const torch::Tensor& geomBuffer,
+	const int R,
+	const torch::Tensor& binningBuffer,
+	const torch::Tensor& imageBuffer,
+	const int power,
+	const bool debug){
+
+	if (means3D.ndimension() != 2 || means3D.size(1) != 3) {
+		AT_ERROR("means3D must have dimensions (num_points, 3)");
+	}
+	
+	const int P = means3D.size(0);
+	const int H = image_height;
+	const int W = image_width;
+
+	int M = 0;
+	if(sh.size(0) != 0)
+	{	
+		M = sh.size(1);
+	}
+
+	auto int_opts = means3D.options().dtype(torch::kInt32);
+	auto float_opts = means3D.options().dtype(torch::kFloat32);
+
+	torch::Tensor dE_dcolor = torch::full({NUM_CHANNELS, H, W}, 0.0, float_opts);
+	torch::Tensor dE_ddepth = torch::full({1, H, W}, 0.0, float_opts);
+
+  if(P != 0)
+  {  
+	  CudaRasterizer::Rasterizer::EIGbackward(P, degree, M, R,
+	  background.contiguous().data<float>(),
+	  W, H, 
+	  means3D.contiguous().data<float>(),
+	  sh.contiguous().data<float>(),
+	  colors.contiguous().data<float>(),
+	  scales.data_ptr<float>(),
+	  scale_modifier,
+	  rotations.data_ptr<float>(),
+	  cov3D_precomp.contiguous().data<float>(),
+	  viewmatrix.contiguous().data<float>(),
+	  projmatrix.contiguous().data<float>(),
+      projmatrix_raw.contiguous().data<float>(),
+	  campos.contiguous().data<float>(),
+	  tan_fovx,
+	  tan_fovy,
+	  radii.contiguous().data<int>(),
+	  reinterpret_cast<char*>(geomBuffer.contiguous().data_ptr()),
+	  reinterpret_cast<char*>(binningBuffer.contiguous().data_ptr()),
+	  reinterpret_cast<char*>(imageBuffer.contiguous().data_ptr()),
+	  dE_dmeans3D.contiguous().data<float>(),
+	  dE_dsh.contiguous().data<float>(),
+	  dE_dopacities.contiguous().data<float>(),
+	  dE_dscales.contiguous().data<float>(),
+	  dE_drotations.contiguous().data<float>(),
+	  dE_dtau.contiguous().data<float>(),
+	  dE_dcolor.contiguous().data<float>(),
+	  dE_ddepth.contiguous().data<float>(),
+	  power,
+	  debug);
+  }
+
+	return std::make_tuple(dE_dcolor, dE_ddepth);
+}

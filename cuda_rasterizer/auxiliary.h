@@ -96,6 +96,22 @@ __forceinline__ __device__ float3 transformVec4x3Transpose(const float3& p, cons
 	return transformed;
 }
 
+__forceinline__ __device__ float3 transformVec4x3Transpose_backward(const float3& p, const float* matrix, const float3& dE_dOutput)
+{
+	// float3 transformed = {
+	// 	matrix[0] * p.x + matrix[1] * p.y + matrix[2] * p.z,
+	// 	matrix[4] * p.x + matrix[5] * p.y + matrix[6] * p.z,
+	// 	matrix[8] * p.x + matrix[9] * p.y + matrix[10] * p.z,
+	// };
+	// return transformed;
+
+	float3 dE_dp;
+	dE_dp.x = dE_dOutput.x * matrix[0] + dE_dOutput.y * matrix[4] + dE_dOutput.z * matrix[8];
+	dE_dp.y = dE_dOutput.x * matrix[1] + dE_dOutput.y * matrix[5] + dE_dOutput.z * matrix[9];
+	dE_dp.z = dE_dOutput.x * matrix[2] + dE_dOutput.y * matrix[6] + dE_dOutput.z * matrix[10];
+	return dE_dp;
+}
+
 __forceinline__ __device__ float dnormvdz(float3 v, float3 dv)
 {
 	float sum2 = v.x * v.x + v.y * v.y + v.z * v.z;
@@ -114,6 +130,23 @@ __forceinline__ __device__ float3 dnormvdv(float3 v, float3 dv)
 	dnormvdv.y = (-v.x * v.y * dv.x + (sum2 - v.y * v.y) * dv.y - v.z * v.y * dv.z) * invsum32;
 	dnormvdv.z = (-v.x * v.z * dv.x - v.y * v.z * dv.y + (sum2 - v.z * v.z) * dv.z) * invsum32;
 	return dnormvdv;
+}
+
+__forceinline__ __device__ float3 dnormvdv_backward(float3 v, float3 dv, float3 dOutput)
+{
+	float sum2 = v.x * v.x + v.y * v.y + v.z * v.z;
+	float invsum32 = 1.0f / sqrt(sum2 * sum2 * sum2);
+
+	// float3 dnormvdv;
+	// dnormvdv.x = ((+sum2 - v.x * v.x) * dv.x - v.y * v.x * dv.y - v.z * v.x * dv.z) * invsum32;
+	// dnormvdv.y = (-v.x * v.y * dv.x + (sum2 - v.y * v.y) * dv.y - v.z * v.y * dv.z) * invsum32;
+	// dnormvdv.z = (-v.x * v.z * dv.x - v.y * v.z * dv.y + (sum2 - v.z * v.z) * dv.z) * invsum32;
+
+	float3 dE_dv;
+	dE_dv.x = invsum32 * (dOutput.x * (sum2 - v.x * v.x) - dOutput.y * v.x * v.y - dOutput.z * v.x * v.z);
+	dE_dv.y = invsum32 * (-dOutput.x * v.x * v.y + dOutput.y * (sum2 - v.y * v.y) - dOutput.z * v.y * v.z);
+	dE_dv.z = invsum32 * (-dOutput.x * v.x * v.z - dOutput.y * v.y * v.z + dOutput.z * (sum2 - v.z * v.z));
+	return dE_dv;
 }
 
 __forceinline__ __device__ float4 dnormvdv(float4 v, float4 dv)
