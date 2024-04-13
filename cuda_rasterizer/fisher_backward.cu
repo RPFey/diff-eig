@@ -621,25 +621,25 @@ __device__ void computeCov3D_EIG_backward(int idx, const glm::vec3 scale, float 
 }
 
 
-template <typename T>
-__device__ void inline reduce_helper(int lane, int i, T *data) {
-  if (lane < i) {
-    data[lane] += data[lane + i];
-  }
-}
+// template <typename T>
+// __device__ void inline reduce_helper(int lane, int i, T *data) {
+//   if (lane < i) {
+//     data[lane] += data[lane + i];
+//   }
+// }
 
-template <typename group_t, typename... Lists>
-__device__ void render_cuda_reduce_sum(group_t g, Lists... lists) {
-  int lane = g.thread_rank();
-  g.sync();
+// template <typename group_t, typename... Lists>
+// __device__ void render_cuda_reduce_sum(group_t g, Lists... lists) {
+//   int lane = g.thread_rank();
+//   g.sync();
 
-  for (int i = g.size() / 2; i > 0; i /= 2) {
-    (...,
-     reduce_helper(
-         lane, i, lists)); // Fold expression: apply reduce_helper for each list
-    g.sync();
-  }
-}
+//   for (int i = g.size() / 2; i > 0; i /= 2) {
+//     (...,
+//      reduce_helper(
+//          lane, i, lists)); // Fold expression: apply reduce_helper for each list
+//     g.sync();
+//   }
+// }
 
 __device__ void computeCov2DCUDARelocated_EIG(int P,
 	const float3* means,

@@ -44,7 +44,6 @@ def main():
     # loss = sum(i.mean() for i in grads) / len(grads)
     loss = sum(i.sum() for i in grads)
     print(loss)
-    breakpoint()
     loss.backward()
 
     for param_name in param_names:

@@ -18,7 +18,7 @@ namespace cg = cooperative_groups;
 
 // Backward pass for conversion of spherical harmonics to RGB for
 // each Gaussian.
-__device__ static void computeColorFromSH(int idx, int deg, int max_coeffs, const glm::vec3* means, glm::vec3 campos, const float* shs, const bool* clamped, const glm::vec3* dL_dcolor, glm::vec3* dL_dmeans, glm::vec3* dL_dshs,  float *dL_dtau)
+__device__ void computeColorFromSH_ff(int idx, int deg, int max_coeffs, const glm::vec3* means, glm::vec3 campos, const float* shs, const bool* clamped, const glm::vec3* dL_dcolor, glm::vec3* dL_dmeans, glm::vec3* dL_dshs,  float *dL_dtau)
 {
 	// Compute intermediate values, as it is done during forward
 	glm::vec3 pos = means[idx];
@@ -146,7 +146,9 @@ __device__ static void computeColorFromSH(int idx, int deg, int max_coeffs, cons
 
 // Backward pass for the conversion of scale and rotation to a 
 // 3D covariance matrix for each Gaussian. 
-__device__ static void computeCov3D(int idx, const glm::vec3 scale, float mod, const glm::vec4 rot, const float* dL_dcov3Ds, glm::vec3* dL_dscales, glm::vec4* dL_drots)
+// Function inside fisher forwarding
+// Got weird issue when using static void 
+__device__ void computeCov3D_ff(int idx, const glm::vec3 scale, float mod, const glm::vec4 rot, const float* dL_dcov3Ds, glm::vec3* dL_dscales, glm::vec4* dL_drots)
 {
 	// Recompute (intermediate) results for the 3D covariance computation.
 	glm::vec4 q = rot;// / glm::length(rot);
@@ -211,25 +213,25 @@ __device__ static void computeCov3D(int idx, const glm::vec3 scale, float mod, c
 	*dL_drot = float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w };//dnormvdv(float4{ rot.x, rot.y, rot.z, rot.w }, float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w });
 }
 
-template <typename T>
-__device__ void inline reduce_helper(int lane, int i, T *data) {
-  if (lane < i) {
-    data[lane] += data[lane + i];
-  }
-}
+// template <typename T>
+// __device__ void inline reduce_helper(int lane, int i, T *data) {
+//   if (lane < i) {
+//     data[lane] += data[lane + i];
+//   }
+// }
 
-template <typename group_t, typename... Lists>
-__device__ void render_cuda_reduce_sum(group_t g, Lists... lists) {
-  int lane = g.thread_rank();
-  g.sync();
+// template <typename group_t, typename... Lists>
+// __device__ void render_cuda_reduce_sum(group_t g, Lists... lists) {
+//   int lane = g.thread_rank();
+//   g.sync();
 
-  for (int i = g.size() / 2; i > 0; i /= 2) {
-    (...,
-     reduce_helper(
-         lane, i, lists)); // Fold expression: apply reduce_helper for each list
-    g.sync();
-  }
-}
+//   for (int i = g.size() / 2; i > 0; i /= 2) {
+//     (...,
+//      reduce_helper(
+//          lane, i, lists)); // Fold expression: apply reduce_helper for each list
+//     g.sync();
+//   }
+// }
 
 __device__ void computeCov2DCUDARelocated(int P,
 	const float3* means,
@@ -545,11 +547,11 @@ __device__ void preprocessCUDARelocated(
 
 	// Compute gradient updates due to computing colors from SHs
 	if (shs)
-		computeColorFromSH(idx, D, M, (glm::vec3*)means, *campos, shs, clamped, (glm::vec3*)dL_dcolor, (glm::vec3*)dL_dmeans, (glm::vec3*)dL_dsh, dL_dtau);
+		computeColorFromSH_ff(idx, D, M, (glm::vec3*)means, *campos, shs, clamped, (glm::vec3*)dL_dcolor, (glm::vec3*)dL_dmeans, (glm::vec3*)dL_dsh, dL_dtau);
 
 	// Compute gradient updates due to computing covariance from scale/rotation
 	if (scales)
-		computeCov3D(idx, scales[idx], scale_modifier, rotations[idx], dL_dcov3D, dL_dscale, dL_drot);
+		computeCov3D_ff(idx, scales[idx], scale_modifier, rotations[idx], dL_dcov3D, dL_dscale, dL_drot);
 }
 
 
