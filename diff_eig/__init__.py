@@ -13,8 +13,8 @@ from typing import NamedTuple
 import torch.nn as nn
 import torch
 from . import _C
-from . import _C as _C_orig
-# from diff_gaussian_rasterization_w_pose import _C as _C_orig
+# from . import _C as _C_orig
+from diff_gaussian_rasterization_w_pose import _C as _C_orig
 
 def cpu_deep_copy_tuple(input_tuple):
     copied_tensors = [item.cpu().clone() if isinstance(item, torch.Tensor) else item for item in input_tuple]
@@ -106,7 +106,7 @@ class _RasterizeGaussians(torch.autograd.Function):
         # Keep relevant tensors for backward
         ctx.raster_settings = raster_settings
         ctx.num_rendered = num_rendered
-        ctx.save_for_backward(colors_precomp, means3D, scales, rotations, cov3Ds_precomp, radii, sh, geomBuffer, binningBuffer, imgBuffer)
+        # ctx.save_for_backward(colors_precomp, means3D, scales, rotations, cov3Ds_precomp, radii, sh, geomBuffer, binningBuffer, imgBuffer)
 
         grad_out_color = torch.ones_like(color)
         grad_out_depth = torch.ones_like(depth)
@@ -146,18 +146,19 @@ class _RasterizeGaussians(torch.autograd.Function):
                 print("\nAn error occured in backward. Writing snapshot_bw.dump for debugging.\n")
                 raise ex
         else:
-             grad_means2D, grad_colors_precomp, grad_opacities, grad_means3D, grad_cov3Ds_precomp, grad_sh, grad_scales, grad_rotations, grad_tau = _C.fisher_forward(*args)
+             grad_means2D, grad_colors_precomp, grad_opacities, grad_means3D, grad_cov3Ds_precomp, grad_sh, grad_scales, grad_rotations, J_tau = _C.fisher_forward(*args)
         
-        ctx.save_for_backward(colors_precomp, means3D, scales, rotations, cov3Ds_precomp, radii, sh, geomBuffer, binningBuffer, imgBuffer)
+        ctx.save_for_backward(colors_precomp, means3D, scales, rotations, cov3Ds_precomp, radii, sh, J_tau, geomBuffer, binningBuffer, imgBuffer)
         
         # Not needed for now
         # J^T J for pose parameters
         if raster_settings.gradient_power > 1:
-            JTJ_tau = torch.mm(grad_tau.view(-1, 6).t(), grad_tau.view(-1, 6))
+            # J_tau: (HxW, 6)
+            JTJ_tau = torch.mm(J_tau.view(-1, 6).t(), J_tau.view(-1, 6))
         else:
             JTJ_tau = None
 
-        grad_tau = torch.sum(grad_tau.view(-1, 6), dim=0)
+        grad_tau = torch.sum(J_tau.view(-1, 6), dim=0)
         grad_rho = grad_tau[:3].view(1, -1)
         grad_theta = grad_tau[3:].view(1, -1)
 
@@ -170,8 +171,10 @@ class _RasterizeGaussians(torch.autograd.Function):
         # Restore necessary values from context
         num_rendered = ctx.num_rendered
         raster_settings = ctx.raster_settings
-        colors_precomp, means3D, scales, rotations, cov3Ds_precomp, radii, sh, geomBuffer, binningBuffer, imgBuffer = ctx.saved_tensors
+        colors_precomp, means3D, scales, rotations, cov3Ds_precomp, radii, sh, J_tau, geomBuffer, binningBuffer, imgBuffer = ctx.saved_tensors
 
+        # d(JTJ_tau)/dJ_tau = 2 * J_tau
+        grad_J_tau = 2 * J_tau @ grad_JTJ_tau.T
         #TODO: compute dE/dImage and dE/dDepth
         # Restructure args as C++ method expects them
         args = (raster_settings.bg,
@@ -192,7 +195,7 @@ class _RasterizeGaussians(torch.autograd.Function):
                 grad_opacities, 
                 grad_scales, 
                 grad_rotations, 
-                grad_JTJ_tau,
+                grad_J_tau,
                 raster_settings.image_height,
                 raster_settings.image_width,
                 sh,
@@ -209,8 +212,12 @@ class _RasterizeGaussians(torch.autograd.Function):
         # import seaborn as sns
         # breakpoint()
         # To avoid overflow during the gradient explosion on the second backward pass
-        grad_out_color = torch.clamp(grad_out_color, -1e10, 1e10)
-        grad_out_depth = torch.clamp(grad_out_depth, -1e10, 1e10)
+        # grad_out_color = torch.clamp(grad_out_color, -1e9, 1e9)
+        # grad_out_depth = torch.clamp(grad_out_depth, -1e9, 1e9)
+
+        grad_out_color = torch.nan_to_num(grad_out_color, 0.)
+        grad_out_depth = torch.nan_to_num(grad_out_depth, 0.)
+
 
         # Restructure args as C++ method expects them
         args = (raster_settings.bg,

@@ -209,8 +209,14 @@ __device__ void computeCov3D_ff(int idx, const glm::vec3 scale, float mod, const
 	dL_dq.w = 2 * r * (dL_dMt[0][1] - dL_dMt[1][0]) + 2 * x * (dL_dMt[2][0] + dL_dMt[0][2]) + 2 * y * (dL_dMt[1][2] + dL_dMt[2][1]) - 4 * z * (dL_dMt[1][1] + dL_dMt[0][0]);
 
 	// Gradients of loss w.r.t. unnormalized quaternion
-	float4* dL_drot = (float4*)(dL_drots + idx);
-	*dL_drot = float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w };//dnormvdv(float4{ rot.x, rot.y, rot.z, rot.w }, float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w });
+	// float4* dL_drot = (float4*)(dL_drots + idx);
+	// *dL_drot = float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w };//dnormvdv(float4{ rot.x, rot.y, rot.z, rot.w }, float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w });
+
+	glm::vec4* dL_drot = dL_drots + idx;
+	dL_drot->x = dL_dq.x;
+	dL_drot->y = dL_dq.y;
+	dL_drot->z = dL_dq.z;
+	dL_drot->w = dL_dq.w;
 }
 
 // template <typename T>

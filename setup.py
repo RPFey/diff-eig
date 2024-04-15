@@ -28,7 +28,12 @@ setup(
             "cuda_rasterizer/fisher_backward.cu",
             "rasterize_points.cu",
             "ext.cpp"],
-            extra_compile_args={"nvcc": ["-I" + os.path.join(os.path.dirname(os.path.abspath(__file__)), "third_party/glm/")]})
+            extra_compile_args={"nvcc": ["-I" + os.path.join(os.path.dirname(os.path.abspath(__file__)), "third_party/glm/"), 
+                                        #  "-O0", "-Xcicc", "-O0", "-Xptxas", "-O0", 
+                                        #  "-G", "-DTORCH_USE_CUDA_DSA"
+                                         ],
+                                # "cxx": ["-g", "-O0"],
+                                })
         ],
     cmdclass={
         'build_ext': BuildExtension
