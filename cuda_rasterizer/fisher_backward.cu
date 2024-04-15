@@ -191,7 +191,7 @@ __device__ void computeColorFromSH_backward(int idx, int deg, int max_coeffs, co
 	// must propagate back into 3D position.
 	glm::vec3 dL_ddir(glm::dot(dRGBdx, dL_dRGB), glm::dot(dRGBdy, dL_dRGB), glm::dot(dRGBdz, dL_dRGB));
 
-	glm::vec3 dE_dmean = {-dE_dtaus[6 * idx + 0], -dE_dtaus[6 * idx + 1], -dE_dtaus[6 * idx + 2]};
+	glm::vec3 dE_dmean(-dE_dtaus[6 * idx + 0], -dE_dtaus[6 * idx + 1], -dE_dtaus[6 * idx + 2]);
 	dE_dmean += dE_dmeans[idx];
 
 	float3 dE_ddir = dnormvdv_backward(float3{ dir_orig.x, dir_orig.y, dir_orig.z }, float3{ dL_ddir.x, dL_ddir.y, dL_ddir.z }, float3{dE_dmean.x, dE_dmean.y, dE_dmean.z});
@@ -426,7 +426,7 @@ __device__ void computeColorFromSH_backward(int idx, int deg, int max_coeffs, co
 
 // Backward pass for the conversion of scale and rotation to a 
 // 3D covariance matrix for each Gaussian. 
-__device__ void computeCov3D_EIG(int idx, const glm::vec3 scale, float mod, const glm::vec4 rot, const float* dL_dcov3Ds, glm::vec3* dL_dscales, glm::vec4* dL_drots)
+__device__ void computeCov3D_EIG(const int idx, const glm::vec3 scale, float mod, const glm::vec4 rot, const float* dL_dcov3Ds, glm::vec3* dL_dscales, glm::vec4* dL_drots)
 {
 	// Recompute (intermediate) results for the 3D covariance computation.
 	glm::vec4 q = rot;// / glm::length(rot);
@@ -487,8 +487,17 @@ __device__ void computeCov3D_EIG(int idx, const glm::vec3 scale, float mod, cons
 	dL_dq.w = 2 * r * (dL_dMt[0][1] - dL_dMt[1][0]) + 2 * x * (dL_dMt[2][0] + dL_dMt[0][2]) + 2 * y * (dL_dMt[1][2] + dL_dMt[2][1]) - 4 * z * (dL_dMt[1][1] + dL_dMt[0][0]);
 
 	// Gradients of loss w.r.t. unnormalized quaternion
-	float4* dL_drot = (float4*)(dL_drots + idx);
-	*dL_drot = float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w };//dnormvdv(float4{ rot.x, rot.y, rot.z, rot.w }, float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w });
+	// float4* dL_drot = (float4*)(dL_drots + idx);
+	glm::vec4* dL_drot = dL_drots + idx;
+#if 1
+	// float4 dL_drot;
+	// dL_drot = float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w };//dnormvdv(float4{ rot.x, rot.y, rot.z, rot.w }, float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w });
+	// *dL_drot = float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w };//dnormvdv(float4{ rot.x, rot.y, rot.z, rot.w }, float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w });
+	dL_drot->x = dL_dq.x;
+	dL_drot->y = dL_dq.y;
+	dL_drot->z = dL_dq.z;
+	dL_drot->w = dL_dq.w;
+#endif
 }
 
 
@@ -621,25 +630,25 @@ __device__ void computeCov3D_EIG_backward(int idx, const glm::vec3 scale, float 
 }
 
 
-template <typename T>
-__device__ void inline reduce_helper(int lane, int i, T *data) {
-  if (lane < i) {
-    data[lane] += data[lane + i];
-  }
-}
+// template <typename T>
+// __device__ void inline reduce_helper(int lane, int i, T *data) {
+//   if (lane < i) {
+//     data[lane] += data[lane + i];
+//   }
+// }
 
-template <typename group_t, typename... Lists>
-__device__ void render_cuda_reduce_sum(group_t g, Lists... lists) {
-  int lane = g.thread_rank();
-  g.sync();
+// template <typename group_t, typename... Lists>
+// __device__ void render_cuda_reduce_sum(group_t g, Lists... lists) {
+//   int lane = g.thread_rank();
+//   g.sync();
 
-  for (int i = g.size() / 2; i > 0; i /= 2) {
-    (...,
-     reduce_helper(
-         lane, i, lists)); // Fold expression: apply reduce_helper for each list
-    g.sync();
-  }
-}
+//   for (int i = g.size() / 2; i > 0; i /= 2) {
+//     (...,
+//      reduce_helper(
+//          lane, i, lists)); // Fold expression: apply reduce_helper for each list
+//     g.sync();
+//   }
+// }
 
 __device__ void computeCov2DCUDARelocated_EIG(int P,
 	const float3* means,
@@ -866,6 +875,7 @@ __device__ void computeCov2DCUDA_backward(int P,
 	// intermediate forward results needed in the backward.
 	float3 mean = means[idx];
 	float3 t = transformPoint4x3(mean, view_matrix);
+	assert(t.z != 0.f);
 	
 	const float limx = 1.3f * tan_fovx;
 	const float limy = 1.3f * tan_fovy;
@@ -1160,7 +1170,7 @@ __device__ void preprocessCUDA_backward(
 	)
 {
 	// auto idx = cg::this_grid().thread_rank();
-	int idx = 0;
+	const int idx = 0;
 	if (idx >= P || !(radii[idx] > 0))
 		return;
 
@@ -1531,13 +1541,14 @@ fisher_backward_kernel(
 				(const float3*)&cur_dL_dmean2D,
 				(glm::vec3*)&cur_dL_dmeans,
 				cur_dL_ddepth,
-				(float*)&cur_dL_dcolors,
+				(const float*)&cur_dL_dcolors,
 				(float*)cur_dL_dcov3D,
 				(float*)cur_dL_dshs,
 				&cur_dL_dscale,
 				&cur_dL_drot,
 				cur_dL_dtau
 			);
+#if 1
 
 			// start the real backward pass
 			//!NOTE: Reflection point
@@ -1628,6 +1639,7 @@ fisher_backward_kernel(
 				const float c = collected_colors[ch * BLOCK_SIZE + j];
 				dE_dpixel[ch] += (c - accum_rec[ch]) * cur_dE_dalpha;				
 			}
+#endif
 		}
 	}
 	if (inside){
