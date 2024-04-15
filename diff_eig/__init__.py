@@ -211,13 +211,18 @@ class _RasterizeGaussians(torch.autograd.Function):
         # import matplotlib.pyplot as plt
         # import seaborn as sns
         # breakpoint()
-        # To avoid overflow during the gradient explosion on the second backward pass
-        # grad_out_color = torch.clamp(grad_out_color, -1e9, 1e9)
-        # grad_out_depth = torch.clamp(grad_out_depth, -1e9, 1e9)
+
+        # if torch.all(torch.isnan(grad_out_color)) or torch.all(torch.isnan(grad_out_depth)):
+        #     breakpoint()
+        assert not torch.all(torch.isnan(grad_out_color)), "all grad_out_color are NaNs"
+        assert not torch.all(torch.isnan(grad_out_depth)), "all grad_out_depth are NaNs"
 
         grad_out_color = torch.nan_to_num(grad_out_color, 0.)
         grad_out_depth = torch.nan_to_num(grad_out_depth, 0.)
 
+        # To avoid overflow during the gradient explosion on the second backward pass
+        grad_out_color = torch.clamp(grad_out_color, -1e9, 1e9)
+        grad_out_depth = torch.clamp(grad_out_depth, -1e9, 1e9)
 
         # Restructure args as C++ method expects them
         args = (raster_settings.bg,
@@ -255,6 +260,12 @@ class _RasterizeGaussians(torch.autograd.Function):
                 raise ex
         else:
              grad_means2D, grad_colors_precomp, grad_opacities, grad_means3D, grad_cov3Ds_precomp, grad_sh, grad_scales, grad_rotations, grad_tau = _C_orig.rasterize_gaussians_backward(*args)
+
+        # if torch.any(grad_tau.isnan()):
+        #     print(grad_tau.isnan().sum() / grad_tau.numel())
+        #     breakpoint()
+        assert not torch.all(grad_tau.isnan()), "all grad_tau are NaNs"
+        grad_tau = torch.nan_to_num(grad_tau, 0.)
         
         grad_tau = torch.sum(grad_tau.view(-1, 6), dim=0)
         grad_rho = grad_tau[:3].view(1, -1)

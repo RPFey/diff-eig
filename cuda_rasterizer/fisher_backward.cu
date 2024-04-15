@@ -489,7 +489,6 @@ __device__ void computeCov3D_EIG(const int idx, const glm::vec3 scale, float mod
 	// Gradients of loss w.r.t. unnormalized quaternion
 	// float4* dL_drot = (float4*)(dL_drots + idx);
 	glm::vec4* dL_drot = dL_drots + idx;
-#if 1
 	// float4 dL_drot;
 	// dL_drot = float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w };//dnormvdv(float4{ rot.x, rot.y, rot.z, rot.w }, float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w });
 	// *dL_drot = float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w };//dnormvdv(float4{ rot.x, rot.y, rot.z, rot.w }, float4{ dL_dq.x, dL_dq.y, dL_dq.z, dL_dq.w });
@@ -497,7 +496,6 @@ __device__ void computeCov3D_EIG(const int idx, const glm::vec3 scale, float mod
 	dL_drot->y = dL_dq.y;
 	dL_drot->z = dL_dq.z;
 	dL_drot->w = dL_dq.w;
-#endif
 }
 
 
@@ -1548,7 +1546,6 @@ fisher_backward_kernel(
 				&cur_dL_drot,
 				cur_dL_dtau
 			);
-#if 1
 
 			// start the real backward pass
 			//!NOTE: Reflection point
@@ -1639,7 +1636,6 @@ fisher_backward_kernel(
 				const float c = collected_colors[ch * BLOCK_SIZE + j];
 				dE_dpixel[ch] += (c - accum_rec[ch]) * cur_dE_dalpha;				
 			}
-#endif
 		}
 	}
 	if (inside){

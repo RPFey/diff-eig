@@ -42,3 +42,16 @@ If you can make use of it in your own research, please be so kind to cite both p
 g++ glm_test.cpp -I./third_party/glm/
 ./a.out
 ```
+
+### CUDA debugging
+
+memchecker:
+```bash
+pip install -e . -v && PYTORCH_NO_CUDA_MEMORY_CACHING=1 compute-sanitizer --tool memcheck python test_fwd.py
+```
+
+
+cuda-gdb, please compile with `"-G"` by modifying `setup.py`
+```bash
+cuda-gdb --args python test_fwd.py
+```
