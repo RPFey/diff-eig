@@ -796,8 +796,10 @@ renderCUDAFused(
 				&dL_dtau[pix_id * 6]);
 
 			// Spheical harmonics degree is (1+deg)**2
+			//!NOTE: because we can't have dynamic size array to be equat to M
+			// Please check if MAX_SH_CHANNELS is equal to M
 			const int num_shs = (1 + D) * (1 + D);
-			const int MAX_SH_CHANNELS = 16;
+			const int MAX_SH_CHANNELS = 1; 
 			float3 cur_dL_dshs[MAX_SH_CHANNELS];
 			memset(cur_dL_dshs, 0,  sizeof(float3) * MAX_SH_CHANNELS);
 			// float 0 should be equal to 0.0f
@@ -857,15 +859,13 @@ renderCUDAFused(
 				atomicAdd(dL_dcov3D + 6 * global_id + ch, powf(cur_dL_dcov3D[ch], grad_power));
 			}
 
-            if(D > 0){
-                glm::vec3* cur_vec3_dL_dshs = ((glm::vec3 *)dL_dsh) + global_id * M;
-                for(int ch = 0; ch < num_shs; ch++)
-                {
-                    atomicAdd((float*) &cur_vec3_dL_dshs[ch].x, powf(cur_dL_dshs[ch].x, grad_power));
-                    atomicAdd((float*) &cur_vec3_dL_dshs[ch].y, powf(cur_dL_dshs[ch].y, grad_power));
-                    atomicAdd((float*) &cur_vec3_dL_dshs[ch].z, powf(cur_dL_dshs[ch].z, grad_power));
-                }
-            }
+			glm::vec3* cur_vec3_dL_dshs = ((glm::vec3 *)dL_dsh) + global_id * M;
+			for(int ch = 0; ch < num_shs; ch++)
+			{
+				atomicAdd((float*) &cur_vec3_dL_dshs[ch].x, powf(cur_dL_dshs[ch].x, grad_power));
+				atomicAdd((float*) &cur_vec3_dL_dshs[ch].y, powf(cur_dL_dshs[ch].y, grad_power));
+				atomicAdd((float*) &cur_vec3_dL_dshs[ch].z, powf(cur_dL_dshs[ch].z, grad_power));
+			}
 			
 			atomicAdd(&dL_dscale[global_id].x, powf(cur_dL_dscale.x, grad_power));
 			atomicAdd(&dL_dscale[global_id].y, powf(cur_dL_dscale.y, grad_power));

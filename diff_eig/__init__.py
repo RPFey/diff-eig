@@ -110,7 +110,7 @@ class _RasterizeGaussians(torch.autograd.Function):
 
         grad_out_color = torch.ones_like(color)
         grad_out_depth = torch.ones_like(depth)
-        assert raster_settings.gradient_power == 2, "useless command, should only be 2"
+        # assert raster_settings.gradient_power == 2, "useless command, should only be 2"
         args = (raster_settings.bg,
                 means3D,
                 radii,
