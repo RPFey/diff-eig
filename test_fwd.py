@@ -10,7 +10,7 @@ def main():
     path = "./test_dict.pt"
 
     test_dict = torch.load(path)
-    raster_settings = SimpleNamespace(**test_dict['raster_settings'])
+    raster_settings = SimpleNamespace(**test_dict['raster_settings'], fisher_scaler=1e-3)
     rasterizer = GaussianRasterizer(raster_settings=raster_settings)
     call_dict = test_dict["call_dict"]
     ref_hessian_dict = test_dict['H']

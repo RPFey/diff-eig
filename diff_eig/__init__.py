@@ -14,7 +14,24 @@ import torch.nn as nn
 import torch
 from . import _C
 # from . import _C as _C_orig
-from diff_gaussian_rasterization_w_pose import _C as _C_orig
+# from diff_gaussian_rasterization_w_pose import _C as _C_orig
+
+class GaussianRasterizationSettings(NamedTuple):
+    image_height: int
+    image_width: int 
+    tanfovx : float
+    tanfovy : float
+    bg : torch.Tensor
+    scale_modifier : float
+    viewmatrix : torch.Tensor
+    projmatrix : torch.Tensor
+    projmatrix_raw : torch.Tensor
+    sh_degree : int
+    campos : torch.Tensor
+    prefiltered : bool
+    gradient_power: int
+    debug : bool
+    fisher_scaler: float
 
 def cpu_deep_copy_tuple(input_tuple):
     copied_tensors = [item.cpu().clone() if isinstance(item, torch.Tensor) else item for item in input_tuple]
@@ -64,7 +81,7 @@ class _RasterizeGaussians(torch.autograd.Function):
         theta,
         rho,
         pose_H,
-        raster_settings,
+        raster_settings: GaussianRasterizationSettings,
     ):
 
         # Restructure arguments the way that the C++ lib expects them
@@ -108,9 +125,12 @@ class _RasterizeGaussians(torch.autograd.Function):
         ctx.num_rendered = num_rendered
         # ctx.save_for_backward(colors_precomp, means3D, scales, rotations, cov3Ds_precomp, radii, sh, geomBuffer, binningBuffer, imgBuffer)
 
-        grad_out_color = torch.ones_like(color)
-        grad_out_depth = torch.ones_like(depth)
+        grad_out_color = torch.ones_like(color) * raster_settings.fisher_scaler
+        grad_out_depth = torch.ones_like(depth) * raster_settings.fisher_scaler
         # assert raster_settings.gradient_power == 2, "useless command, should only be 2"
+
+        # Quick fix as the jacobian from depth and image are different
+        # Image Pass
         args = (raster_settings.bg,
                 means3D,
                 radii,
@@ -125,6 +145,44 @@ class _RasterizeGaussians(torch.autograd.Function):
                 raster_settings.tanfovx,
                 raster_settings.tanfovy,
                 grad_out_color,
+                torch.zeros_like(grad_out_depth),
+                sh,
+                raster_settings.sh_degree,
+                raster_settings.campos,
+                geomBuffer,
+                num_rendered,
+                binningBuffer,
+                imgBuffer,
+                raster_settings.gradient_power,
+                raster_settings.debug)
+
+        # Compute gradients for relevant tensors by invoking backward method
+        if raster_settings.debug:
+            cpu_args = cpu_deep_copy_tuple(args) # Copy them before they can be corrupted
+            try:
+                img_grad_means2D, img_grad_colors_precomp, img_grad_opacities, img_grad_means3D, img_grad_cov3Ds_precomp, img_grad_sh, img_grad_scales, img_grad_rotations, img_grad_tau = _C.fisher_forward(*args)
+            except Exception as ex:
+                torch.save(cpu_args, "snapshot_bw.dump")
+                print("\nAn error occured in backward. Writing snapshot_bw.dump for debugging.\n")
+                raise ex
+        else:
+             img_grad_means2D, img_grad_colors_precomp, img_grad_opacities, img_grad_means3D, img_grad_cov3Ds_precomp, img_grad_sh, img_grad_scales, img_grad_rotations, img_J_tau = _C.fisher_forward(*args)
+
+        # depth Pass
+        args = (raster_settings.bg,
+                means3D,
+                radii,
+                colors_precomp,
+                scales,
+                rotations,
+                raster_settings.scale_modifier,
+                cov3Ds_precomp,
+                raster_settings.viewmatrix,
+                raster_settings.projmatrix,
+                raster_settings.projmatrix_raw,
+                raster_settings.tanfovx,
+                raster_settings.tanfovy,
+                torch.zeros_like(grad_out_color),
                 grad_out_depth,
                 sh,
                 raster_settings.sh_degree,
@@ -140,14 +198,22 @@ class _RasterizeGaussians(torch.autograd.Function):
         if raster_settings.debug:
             cpu_args = cpu_deep_copy_tuple(args) # Copy them before they can be corrupted
             try:
-                grad_means2D, grad_colors_precomp, grad_opacities, grad_means3D, grad_cov3Ds_precomp, grad_sh, grad_scales, grad_rotations, grad_tau = _C.fisher_forward(*args)
+                depth_grad_means2D, depth_grad_colors_precomp, depth_grad_opacities, depth_grad_means3D, depth_grad_cov3Ds_precomp, depth_grad_sh, depth_grad_scales, depth_grad_rotations, depth_grad_tau = _C.fisher_forward(*args)
             except Exception as ex:
                 torch.save(cpu_args, "snapshot_bw.dump")
                 print("\nAn error occured in backward. Writing snapshot_bw.dump for debugging.\n")
                 raise ex
         else:
-             grad_means2D, grad_colors_precomp, grad_opacities, grad_means3D, grad_cov3Ds_precomp, grad_sh, grad_scales, grad_rotations, J_tau = _C.fisher_forward(*args)
+             depth_grad_means2D, depth_grad_colors_precomp, depth_grad_opacities, depth_grad_means3D, depth_grad_cov3Ds_precomp, depth_grad_sh, depth_grad_scales, depth_grad_rotations, depth_J_tau = _C.fisher_forward(*args)
         
+        # The fisher has been squared anyway 
+        J_tau = torch.cat([img_J_tau, depth_J_tau], dim=0)
+        grad_means3D = img_grad_means3D + depth_grad_means3D
+        grad_sh = img_grad_sh + depth_grad_sh
+        grad_opacities = img_grad_opacities + depth_grad_opacities
+        grad_scales = img_grad_scales + depth_grad_scales
+        grad_rotations = img_grad_rotations + depth_grad_rotations
+
         ctx.save_for_backward(colors_precomp, means3D, scales, rotations, cov3Ds_precomp, radii, sh, J_tau, geomBuffer, binningBuffer, imgBuffer)
         
         # Not needed for now
@@ -156,7 +222,8 @@ class _RasterizeGaussians(torch.autograd.Function):
             # J_tau: (HxW, 6)
             JTJ_tau = torch.mm(J_tau.view(-1, 6).t(), J_tau.view(-1, 6))
         else:
-            JTJ_tau = None
+            # TODO: refine this temporal hack because the output shape is different
+            JTJ_tau = J_tau 
 
         grad_tau = torch.sum(J_tau.view(-1, 6), dim=0)
         grad_rho = grad_tau[:3].view(1, -1)
@@ -174,8 +241,10 @@ class _RasterizeGaussians(torch.autograd.Function):
         colors_precomp, means3D, scales, rotations, cov3Ds_precomp, radii, sh, J_tau, geomBuffer, binningBuffer, imgBuffer = ctx.saved_tensors
 
         # d(JTJ_tau)/dJ_tau = 2 * J_tau
-        grad_J_tau = 2 * J_tau @ grad_JTJ_tau.T
-        #TODO: compute dE/dImage and dE/dDepth
+        img_J_tau = J_tau[:J_tau.shape[0]//2]
+        img_grad_J_tau = 2 * img_J_tau @ grad_JTJ_tau.T
+
+        # Image pass
         # Restructure args as C++ method expects them
         args = (raster_settings.bg,
                 means3D,
@@ -195,7 +264,7 @@ class _RasterizeGaussians(torch.autograd.Function):
                 grad_opacities, 
                 grad_scales, 
                 grad_rotations, 
-                grad_J_tau,
+                img_grad_J_tau,
                 raster_settings.image_height,
                 raster_settings.image_width,
                 sh,
@@ -207,7 +276,50 @@ class _RasterizeGaussians(torch.autograd.Function):
                 imgBuffer,
                 raster_settings.gradient_power,
                 raster_settings.debug)
-        grad_out_color, grad_out_depth = _C.fisher_backward(*args) 
+        img_grad_out_color, img_grad_out_depth = _C.fisher_backward(*args) 
+
+        # depth pass
+        depth_J_tau = J_tau[J_tau.shape[0]//2:]
+        depth_grad_J_tau = 2 * depth_J_tau @ grad_JTJ_tau.T
+        # Restructure args as C++ method expects them
+        args = (raster_settings.bg,
+                means3D,
+                radii,
+                colors_precomp,
+                scales,
+                rotations,
+                raster_settings.scale_modifier,
+                cov3Ds_precomp,
+                raster_settings.viewmatrix,
+                raster_settings.projmatrix,
+                raster_settings.projmatrix_raw,
+                raster_settings.tanfovx,
+                raster_settings.tanfovy,
+                grad_means3D, 
+                grad_sh, 
+                grad_opacities, 
+                grad_scales, 
+                grad_rotations, 
+                depth_grad_J_tau,
+                raster_settings.image_height,
+                raster_settings.image_width,
+                sh,
+                raster_settings.sh_degree,
+                raster_settings.campos,
+                geomBuffer,
+                num_rendered,
+                binningBuffer,
+                imgBuffer,
+                raster_settings.gradient_power,
+                raster_settings.debug)
+        depth_grad_out_color, depth_grad_out_depth = _C.fisher_backward(*args) 
+
+        # discard the img_grad_out_depth and depth_grad_out_color because they were zeros in the forward pass
+        grad_out_color = img_grad_out_color
+        grad_out_depth = depth_grad_out_depth
+
+        # NOTE: should we scale back with the fisher scaler?
+
         # import matplotlib.pyplot as plt
         # import seaborn as sns
         # breakpoint()
@@ -253,13 +365,13 @@ class _RasterizeGaussians(torch.autograd.Function):
         if raster_settings.debug:
             cpu_args = cpu_deep_copy_tuple(args) # Copy them before they can be corrupted
             try:
-                grad_means2D, grad_colors_precomp, grad_opacities, grad_means3D, grad_cov3Ds_precomp, grad_sh, grad_scales, grad_rotations, grad_tau = _C_orig.rasterize_gaussians_backward(*args)
+                grad_means2D, grad_colors_precomp, grad_opacities, grad_means3D, grad_cov3Ds_precomp, grad_sh, grad_scales, grad_rotations, grad_tau = _C.rasterize_gaussians_backward(*args)
             except Exception as ex:
                 torch.save(cpu_args, "snapshot_bw.dump")
                 print("\nAn error occured in backward. Writing snapshot_bw.dump for debugging.\n")
                 raise ex
         else:
-             grad_means2D, grad_colors_precomp, grad_opacities, grad_means3D, grad_cov3Ds_precomp, grad_sh, grad_scales, grad_rotations, grad_tau = _C_orig.rasterize_gaussians_backward(*args)
+             grad_means2D, grad_colors_precomp, grad_opacities, grad_means3D, grad_cov3Ds_precomp, grad_sh, grad_scales, grad_rotations, grad_tau = _C.rasterize_gaussians_backward(*args)
 
         # if torch.any(grad_tau.isnan()):
         #     print(grad_tau.isnan().sum() / grad_tau.numel())
@@ -288,21 +400,6 @@ class _RasterizeGaussians(torch.autograd.Function):
 
         return grads
 
-class GaussianRasterizationSettings(NamedTuple):
-    image_height: int
-    image_width: int 
-    tanfovx : float
-    tanfovy : float
-    bg : torch.Tensor
-    scale_modifier : float
-    viewmatrix : torch.Tensor
-    projmatrix : torch.Tensor
-    projmatrix_raw : torch.Tensor
-    sh_degree : int
-    campos : torch.Tensor
-    prefiltered : bool
-    gradient_power: int
-    debug : bool
 
 class GaussianRasterizer(nn.Module):
     def __init__(self, raster_settings):

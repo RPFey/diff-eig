@@ -10,7 +10,7 @@ def main():
     path = "./test_dict.pt"
 
     test_dict = torch.load(path)
-    raster_settings = SimpleNamespace(**test_dict['raster_settings'])
+    raster_settings = SimpleNamespace(**test_dict['raster_settings'], fisher_scaler=1.)
     raster_settings.gradient_power = 1
 
     rasterizer = GaussianRasterizer(raster_settings=raster_settings)
@@ -65,7 +65,7 @@ ref_norm: {torch.norm(orig_call_dict[k].grad).item():.3f},\t cur_norm: {torch.no
 
     # for param_name in param_names:
     #     print(f"{param_name} grad: {call_dict[param_name].grad}"    )
-    breakpoint()
+    # breakpoint()
     
 
 
