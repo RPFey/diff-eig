@@ -9,7 +9,7 @@
 # For inquiries contact  george.drettakis@inria.fr
 #
 
-from typing import NamedTuple
+from typing import NamedTuple, Union
 import torch.nn as nn
 import torch
 from . import _C
@@ -31,7 +31,8 @@ class GaussianRasterizationSettings(NamedTuple):
     prefiltered : bool
     gradient_power: int
     debug : bool
-    fisher_scaler: float
+    fisher_color: Union[float, torch.Tensor]
+    fisher_depth: Union[float, torch.Tensor]
 
 def cpu_deep_copy_tuple(input_tuple):
     copied_tensors = [item.cpu().clone() if isinstance(item, torch.Tensor) else item for item in input_tuple]
@@ -125,8 +126,15 @@ class _RasterizeGaussians(torch.autograd.Function):
         ctx.num_rendered = num_rendered
         # ctx.save_for_backward(colors_precomp, means3D, scales, rotations, cov3Ds_precomp, radii, sh, geomBuffer, binningBuffer, imgBuffer)
 
-        grad_out_color = torch.ones_like(color) * raster_settings.fisher_scaler
-        grad_out_depth = torch.ones_like(depth) * raster_settings.fisher_scaler
+        if isinstance(raster_settings.fisher_color, float):
+            grad_out_color = torch.ones_like(color) * raster_settings.fisher_color
+        else:
+            grad_out_color = raster_settings.fisher_color
+        
+        if isinstance(raster_settings.fisher_depth, float):
+            grad_out_depth = torch.ones_like(depth) * raster_settings.fisher_depth
+        else:
+            grad_out_depth = raster_settings.fisher_depth
         # assert raster_settings.gradient_power == 2, "useless command, should only be 2"
 
         # Quick fix as the jacobian from depth and image are different
