@@ -170,6 +170,14 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Te
   torch::Tensor dL_drotations = torch::zeros({P, 4}, means3D.options());
   // Jacobian w.r.t to RGB is different from depth
   torch::Tensor dL_dtau = torch::zeros({H * W * 2, 6}, means3D.options()); 
+// debugging only
+//   printf("dL_dsh size: %d %d %d\n", dL_dsh.size(0), dL_dsh.size(1), dL_dsh.size(2));
+//   printf("sh pointer: %p\n", sh.contiguous().data<float>());
+//   printf("degree: %d\n", degree);
+//   printf("dL_dsh pointer: %p\n", dL_dsh.contiguous().data<float>());
+//   if (sh.contiguous().data<float>()){
+// 	printf("sh pointer is not NULL: %p\n", sh.contiguous().data<float>());
+//   }
 
   if(P != 0)
   {  

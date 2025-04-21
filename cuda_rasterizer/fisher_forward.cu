@@ -859,12 +859,14 @@ renderCUDAFused(
 				atomicAdd(dL_dcov3D + 6 * global_id + ch, powf(cur_dL_dcov3D[ch], grad_power));
 			}
 
-			glm::vec3* cur_vec3_dL_dshs = ((glm::vec3 *)dL_dsh) + global_id * M;
-			for(int ch = 0; ch < num_shs; ch++)
-			{
-				atomicAdd((float*) &cur_vec3_dL_dshs[ch].x, powf(cur_dL_dshs[ch].x, grad_power));
-				atomicAdd((float*) &cur_vec3_dL_dshs[ch].y, powf(cur_dL_dshs[ch].y, grad_power));
-				atomicAdd((float*) &cur_vec3_dL_dshs[ch].z, powf(cur_dL_dshs[ch].z, grad_power));
+			if (shs){
+				glm::vec3* cur_vec3_dL_dshs = ((glm::vec3 *)dL_dsh) + global_id * M;
+				for(int ch = 0; ch < num_shs; ch++)
+				{
+					atomicAdd((float*) &cur_vec3_dL_dshs[ch].x, powf(cur_dL_dshs[ch].x, grad_power));
+					atomicAdd((float*) &cur_vec3_dL_dshs[ch].y, powf(cur_dL_dshs[ch].y, grad_power));
+					atomicAdd((float*) &cur_vec3_dL_dshs[ch].z, powf(cur_dL_dshs[ch].z, grad_power));
+				}
 			}
 			
 			atomicAdd(&dL_dscale[global_id].x, powf(cur_dL_dscale.x, grad_power));
